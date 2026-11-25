@@ -22,7 +22,7 @@ This repository is an open-source rebuild of the project. It includes:
 |---|---|
 | Primary detector | Random forest on linguistic features |
 | Detection accuracy | **97%** across test sets |
-| Scale of decay analysis | **750,000** samples across multiple detection models |
+| Scale of decay analysis | **789,992** samples across multiple detection models |
 | Evaluation | Accuracy, precision, recall, F1 and a comparison across detectors |
 
 You can regenerate the full comparison and decay tables with `make compare` and `make decay`. They are written to `results/`.
