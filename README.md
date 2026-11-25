@@ -3,7 +3,6 @@
 [![CI](https://github.com/JamieCrock/ai_detectability_decay/actions/workflows/ci.yml/badge.svg)](https://github.com/JamieCrock/ai_detectability_decay/actions/workflows/ci.yml)
 ![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-blue)
 ![scikit-learn](https://img.shields.io/badge/scikit--learn-random%20forest-orange)
-[![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 My BSc Computer Science with AI dissertation at Swansea University asked how quickly AI-text detectors lose their edge once generated text is edited, again and again, to look human. The dissertation was awarded **85% (First Class)** and won the **Computer Society Prize** for the highest dissertation mark in the cohort.
 
@@ -135,7 +134,3 @@ AI-text detectors are probabilistic. False positives happen more often with shor
 
 - HC3 dataset: Guo et al., *How Close is ChatGPT to Human Experts? Comparison Corpus, Evaluation, and Detection* (2023), released under CC BY-SA 4.0.
 - Supervised at Swansea University, Department of Computer Science.
-
-## Licence
-
-MIT © 2026 Jamie Crockett

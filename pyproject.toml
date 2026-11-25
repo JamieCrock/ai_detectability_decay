@@ -8,7 +8,6 @@ version = "1.0.0"
 description = "Linguistic-feature AI-text detectors and an analysis of how detectability decays under successive evasion transformations."
 readme = "README.md"
 requires-python = ">=3.11"
-license = { text = "MIT" }
 authors = [{ name = "Jamie Crockett" }]
 dependencies = [
     "numpy>=1.24",
