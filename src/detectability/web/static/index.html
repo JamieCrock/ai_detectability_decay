@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AI Detectability</title>
+  <style>
+    :root {
+      --bg: #f6f7f9; --card: #ffffff; --ink: #1c2330; --muted: #5d6878;
+      --line: #dfe3ea; --accent: #2f5bea; --ai: #c2410c; --human: #0f766e;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root { --bg: #11151c; --card: #19202a; --ink: #e8ecf2; --muted: #9aa6b6;
+              --line: #2a3340; --accent: #7c9cff; --ai: #fb923c; --human: #2dd4bf; }
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; font: 16px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif;
+           background: var(--bg); color: var(--ink); }
+    main { max-width: 860px; margin: 0 auto; padding: 40px 20px 64px; }
+    h1 { font-size: 1.7rem; margin: 0 0 4px; letter-spacing: -0.01em; }
+    .sub { color: var(--muted); margin: 0 0 24px; }
+    .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 20px; margin-bottom: 18px; }
+    textarea { width: 100%; min-height: 220px; resize: vertical; padding: 14px; border-radius: 8px;
+               border: 1px solid var(--line); background: transparent; color: inherit; font: inherit; }
+    textarea:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+    .row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 12px; flex-wrap: wrap; }
+    button { background: var(--accent); color: #fff; border: 0; border-radius: 8px; padding: 10px 20px;
+             font: inherit; font-weight: 600; cursor: pointer; }
+    button:disabled { opacity: 0.6; cursor: progress; }
+    .count { color: var(--muted); font-size: 0.9rem; }
+    .verdict { font-size: 1.35rem; font-weight: 700; margin: 0 0 10px; }
+    .meter { position: relative; height: 14px; border-radius: 7px;
+             background: linear-gradient(90deg, var(--human), #a3a3a3 50%, var(--ai)); }
+    .needle { position: absolute; top: -5px; width: 4px; height: 24px; border-radius: 2px;
+              background: var(--ink); transform: translateX(-2px); transition: left .4s ease; }
+    .scale { display: flex; justify-content: space-between; color: var(--muted); font-size: 0.8rem; margin-top: 6px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 14px; font-size: 0.92rem; }
+    th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--line); }
+    th { color: var(--muted); font-weight: 600; }
+    td.num { font-variant-numeric: tabular-nums; }
+    .tag { font-size: 0.78rem; font-weight: 700; padding: 2px 8px; border-radius: 999px; }
+    .tag.ai { color: var(--ai); border: 1px solid var(--ai); }
+    .tag.human { color: var(--human); border: 1px solid var(--human); }
+    .error { color: var(--ai); }
+    .banner { border-left: 4px solid var(--ai); padding: 10px 14px; background: var(--card); margin-bottom: 18px; border-radius: 6px; }
+    footer { color: var(--muted); font-size: 0.85rem; }
+    [hidden] { display: none !important; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>AI Detectability</h1>
+  <p class="sub">Random-forest detector over 31 interpretable linguistic features. Paste a passage to estimate whether it was written by a language model.</p>
+
+  <div id="demo-banner" class="banner" hidden>
+    This instance is running the <strong>demo model</strong> trained on a small synthetic corpus, so predictions on real text are not meaningful. Train on HC3 with <code>make data train</code> for real results.
+  </div>
+
+  <section class="card">
+    <label for="text" class="count">Text to analyse (at least 15 words)</label>
+    <textarea id="text" placeholder="Paste a paragraph here..."></textarea>
+    <div class="row">
+      <span id="count" class="count">0 words</span>
+      <button id="go" type="button">Analyse</button>
+    </div>
+    <p id="error" class="error" role="alert" hidden></p>
+  </section>
+
+  <section id="result" class="card" hidden aria-live="polite">
+    <p id="verdict" class="verdict"></p>
+    <div class="meter" aria-hidden="true"><div id="needle" class="needle" style="left:50%"></div></div>
+    <div class="scale"><span>Human</span><span id="prob"></span><span>AI</span></div>
+    <table>
+      <thead><tr><th>Most influential feature</th><th>This text</th><th>Human avg</th><th>AI avg</th><th>Leans</th></tr></thead>
+      <tbody id="features"></tbody>
+    </table>
+  </section>
+
+  <footer id="model"></footer>
+</main>
+<script>
+  const $ = (id) => document.getElementById(id);
+  const words = (s) => (s.match(/[A-Za-z]+(?:'[A-Za-z]+)?|\d+/g) || []).length;
+  const pretty = (name) => name.replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase());
+  const fmt = (x) => Math.abs(x) >= 100 ? x.toFixed(0) : Math.abs(x) >= 10 ? x.toFixed(1) : x.toFixed(3);
+
+  $("text").addEventListener("input", () => { $("count").textContent = `${words($("text").value)} words`; });
+
+  fetch("/api/model").then((r) => r.json()).then((m) => {
+    const f1 = m.metrics && m.metrics.f1 !== undefined ? ` · held-out F1 ${m.metrics.f1.toFixed(3)}` : "";
+    $("model").textContent = `Model: ${m.detector} · trained on ${m.trained_on} (${m.n_train.toLocaleString()} texts)${f1}`;
+    if (m.trained_on.toLowerCase().includes("synthetic")) $("demo-banner").hidden = false;
+  }).catch(() => {});
+
+  $("go").addEventListener("click", async () => {
+    const text = $("text").value;
+    $("error").hidden = true;
+    $("go").disabled = true;
+    try {
+      const res = await fetch("/api/predict", {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(typeof data.detail === "string" ? data.detail : "Request failed");
+      render(data);
+    } catch (err) {
+      $("error").textContent = err.message;
+      $("error").hidden = false;
+    } finally {
+      $("go").disabled = false;
+    }
+  });
+
+  function render(d) {
+    $("result").hidden = false;
+    $("verdict").textContent = d.verdict;
+    $("needle").style.left = `${(d.p_ai * 100).toFixed(1)}%`;
+    $("prob").textContent = `P(AI) = ${(d.p_ai * 100).toFixed(1)}%`;
+    const body = $("features");
+    body.replaceChildren();
+    for (const f of d.top_features) {
+      const tr = document.createElement("tr");
+      const cells = [pretty(f.name), fmt(f.value), fmt(f.human_mean), fmt(f.ai_mean)];
+      cells.forEach((v, i) => {
+        const td = document.createElement("td");
+        td.textContent = v;
+        if (i > 0) td.className = "num";
+        tr.appendChild(td);
+      });
+      const tag = document.createElement("span");
+      tag.className = `tag ${f.leans}`;
+      tag.textContent = f.leans === "ai" ? "AI" : "Human";
+      const td = document.createElement("td");
+      td.appendChild(tag);
+      tr.appendChild(td);
+      body.appendChild(tr);
+    }
+  }
+</script>
+</body>
+</html>
